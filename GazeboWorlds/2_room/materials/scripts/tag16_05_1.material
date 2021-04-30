@@ -1,0 +1,14 @@
+material tag16_05_1/Diffuse
+{
+  receive_shadows off
+  technique
+  {
+    pass
+    {
+      texture_unit
+      {
+        texture tag16_05_00001.png
+      }
+    }
+  }
+}
