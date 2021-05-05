@@ -19,6 +19,8 @@ import math
 import numpy as np  # Numerical Analysis library
 import cv2  # Computer Vision library
 import apriltag
+from itertools import chain
+import collections
 
 import rospy  # ROS Python interface
 from sensor_msgs.msg import CompressedImage  # ROS CompressedImage message
@@ -169,18 +171,63 @@ class MiRoClient:
             flat_img = self.rectifyImages(image, 0)
             # Run the detect AprilTag procedure
             detected = self.detect_AprilTags(flat_img, 0)
-            if detected && self.roomTags == None:
-                self.currentRoom = # search for key corresponding to detected tag in dict
-                # then flatten the values in the dict 
+
+            if len(detected) > 0 and len(self.foundRoomTags) == 0:
+                for key in self.dictAllTags:
+                    vals = self.dictAllTags.get(key)
+                    flat = list(chain.from_iterable(vals))
+                    print(flat)
+                    if detected[0] in flat:
+                        self.currentRoom = key
+                        print(key)
+                        self.allRoomTags = flat
+                        break
+
             for tag in detected:
-                if tag not in self.roomTags:
-                self.roomTags.append(tag)
+                # in simulation it recognises tags in other rooms through doorways
+                if tag not in self.foundRoomTags and tag in self.allRoomTags:
+                    self.foundRoomTags.append(tag)
         # Have all AprilTags been detected?
-        if not self.ball[0] and not self.ball[1]:
-            self.drive(self.SLOW, -self.SLOW)
+        if sorted(self.foundRoomTags) == sorted(self.allRoomTags):
+            if len(self.allRoomTags) > 0:
+                print("Found all tags in room")
+                print(self.foundRoomTags, self.allRoomTags)
+                self.status_code = 2
+                self.just_switched = True
         else:
-            self.status_code = 2  # Switch to the second action
-            self.just_switched = True
+            self.drive(self.SLOW, -self.SLOW)
+
+
+    def find_Doorway(self):
+        """
+        [2 of 3] Once all AprilTags in the room are found and the room it is in is known...
+        Detect a doorway to move through
+        """
+        if self.just_switched:  # Print once
+            print("MiRo is finding a doorway...")
+            self.just_switched = False
+
+        for index in range(2):  # For each camera (0 = left, 1 = right)
+            # Skip if there's no new image, in case the network is choking
+            if not self.new_frame[index]:
+                continue
+            image = self.input_camera[index]
+            # Run the detect ball procedure
+            self.doorway[index] = self.detect_AprilTags(image, index)
+        # If only the right camera sees the ball, rotate clockwise
+        if len(self.doorway[0]) == 2 and len(self.doorway[1]) == 2:
+            self.drive(self.FAST, self.FAST)
+        # Conversely, rotate counterclockwise
+        elif self.ball[0] and not self.ball[1]:
+            self.drive(-self.SLOW, self.SLOW)
+        # Make the MiRo face the ball if it's visible with both cameras
+        elif not self.doorway[0] and self.doorway[1]:
+            self.drive(self.SLOW, -self.SLOW)
+        elif len(self.doorway[0] > 0) and len(self.dooorway[1] > 0):
+            self.drive(self.SLOW, self.SLOW)
+        # Otherwise, the ball is lost :-(
+        else:
+            self.drive(self.SlOW, -self.SLOW)
 
 
 
@@ -226,7 +273,7 @@ class MiRoClient:
         # New frame notification
         self.new_frame = [False, False]
         # Create variable to store a list of ball's x, y, and r values for each camera
-        self.ball = [None, None]
+        self.doorway = [None, None]
         # Set the default frame width (gets updated on reciecing an image)
         self.frame_width = 640
         # Action selector to reduce duplicate printing to the terminal
@@ -235,9 +282,10 @@ class MiRoClient:
         self.bookmark = 0
         # Sonar sensor
         self.sonar=None
-        self.roomTags=[]
+        self.foundRoomTags=[]
         self.dictAllTags={'A':[[0,1],[2,3]], 'B':[[4,5],[6,7]], 'C':[[8,9],[10,11]]}
         self.currentRoom=None
+        self.allRoomTags=[]
         # Move the head to default pose
         self.reset_head_pose()
 	self.tag = AprilTagPerception(10)
@@ -263,7 +311,7 @@ class MiRoClient:
 
             # Step 2. Approach
             elif self.status_code == 2:
-                self.love()
+                self.find_Doorway()
 
             # Fall back
             else:
