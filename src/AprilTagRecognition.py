@@ -1,9 +1,5 @@
 #!/usr/bin/env python
 """
-Leader-follower flocking for MiRo
-Under construction.
-
-
 The code was tested for Python 2 and 3
 For Python 3 you might need to change the shebang line to
 #!/usr/bin/env python3
