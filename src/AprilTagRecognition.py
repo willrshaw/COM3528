@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 """
-The code was tested for Python 2 and 3
-For Python 3 you might need to change the shebang line to
-#!/usr/bin/env python3
+Code for recognising AprilTags in a room and moving through a selected doorwayss
 """
 
 # Imports
 ##########################
 import os
 import sys
-sys.path.append('common')
 from math import radians  # This is used to reset the head pose
 import math
 import numpy as np  # Numerical Analysis library
@@ -17,6 +14,8 @@ import cv2  # Computer Vision library
 import apriltag
 from itertools import chain
 import collections
+import camera_configs
+from apriltag_perception import AprilTagPerception
 
 import rospy  # ROS Python interface
 from sensor_msgs.msg import CompressedImage  # ROS CompressedImage message
@@ -25,8 +24,6 @@ from cv_bridge import CvBridge, CvBridgeError  # ROS -> OpenCV converter
 from geometry_msgs.msg import TwistStamped  # ROS cmd_vel (velocity control) message
 import random
 import miro2 as miro  # Import MiRo Developer Kit library
-import camera_configs
-from apriltag_perception import AprilTagPerception
 
 try:
     from miro2.lib import wheel_speed2cmd_vel  # Python 3
@@ -115,7 +112,9 @@ class MiRoClient:
     def callback_package(self, msg):
         self.sonar = msg.sonar.range
 
-    def rectifyImages(self, image, index): # either left or right image
+
+    # Flattens retrived images from cameras to fix radial distortion
+    def rectifyImages(self, image, index):
         if index == 0:
             img_rectified = cv2.remap(image, \
                             camera_configs.left_map1, \
@@ -144,15 +143,15 @@ class MiRoClient:
         self.new_frame[index] = False
         tags = self.tag.detect_tags(frame)
         centres = []
-        tagIds = []
+        tagsFound = []
 
         if tags:
             for i in range (len(tags)):
-                tagIds.append(tags[i].id)
-                print(tags[i].family, tags[i].id)
-	return tagIds
+                tagsFound.append([tags[i].id, tags[i].distance, tags[i].centre])
+	return tagsFound
 
 
+    # Switches to move through doorway once all AprilTags in a given room are identified
     def look_for_AprilTags(self):
         """
         [1 of 3] Wander MiRo if it doesn't see an AprilTag in its current
@@ -172,24 +171,21 @@ class MiRoClient:
                 for key in self.dictAllTags:
                     vals = self.dictAllTags.get(key)
                     flat = list(chain.from_iterable(vals))
-                    print(flat)
-                    if detected[0] in flat:
+                    if detected[0][0] in flat:
                         self.currentRoom = key
-                        print(key)
                         self.allRoomTags = flat
                         break
 
             for tag in detected:
-                # in simulation it recognises tags in other rooms through doorways
-                if tag not in self.foundRoomTags and tag in self.allRoomTags:
+                if tag[0] not in [item[0] for item in self.foundRoomTags] and tag[0] in self.allRoomTags:
                     self.foundRoomTags.append(tag)
         # Have all AprilTags been detected?
-        if sorted(self.foundRoomTags) == sorted(self.allRoomTags):
-            if len(self.allRoomTags) > 0:
-                print("Found all tags in room")
-                print(self.foundRoomTags, self.allRoomTags)
-                self.status_code = 2
-                self.just_switched = True
+        justIdsFound = [item[0] for item in self.foundRoomTags]
+        if sorted(justIdsFound) == sorted(self.allRoomTags) and len(self.allRoomTags) > 0:
+            print("Found all tags in room")
+            print(self.foundRoomTags, self.allRoomTags)
+            self.status_code = 2
+            self.just_switched = True
         else:
             self.drive(self.SLOW, -self.SLOW)
 
@@ -208,22 +204,21 @@ class MiRoClient:
             if not self.new_frame[index]:
                 continue
             image = self.input_camera[index]
+            flat_img = self.rectifyImages(image, index)
             # Run the detect ball procedure
-            self.doorway[index] = self.detect_AprilTags(image, index)
-        # If only the right camera sees the ball, rotate clockwise
-        if len(self.doorway[0]) == 2 and len(self.doorway[1]) == 2:
-            self.drive(self.FAST, self.FAST)
-        # Conversely, rotate counterclockwise
-        elif self.ball[0] and not self.ball[1]:
+            self.doorway[index] = self.detect_AprilTags(flat_img, index)
+
+        if not self.doorway[0] and not self.doorway[1]:
             self.drive(-self.SLOW, self.SLOW)
-        # Make the MiRo face the ball if it's visible with both cameras
         elif not self.doorway[0] and self.doorway[1]:
-            self.drive(self.SLOW, -self.SLOW)
-        elif len(self.doorway[0] > 0) and len(self.dooorway[1] > 0):
-            self.drive(self.SLOW, self.SLOW)
-        # Otherwise, the ball is lost :-(
+            self.drive(-self.SLOW, self.SLOW)
+        elif self.doorway[0] and not self.doorway[1]:
+            self.drive(-self.SLOW, self.SLOW)
+        elif len(self.doorway[0]) == 2 and len(self.doorway[1]) == 2:
+            self.drive(self.FAST, self.FAST)
         else:
-            self.drive(self.SlOW, -self.SLOW)
+            print(len(self.doorway[0]), len(self.doorway[1]))
+            self.drive(-self.SLOW, self.SLOW)
 
 
 
@@ -236,7 +231,7 @@ class MiRoClient:
         # Initialise CV Bridge
         self.image_converter = CvBridge()
         # Individual robot name acts as ROS topic prefix
-        topic_base_name = "/" + "miro"# os.getenv(str("MIRO_ROBOT_NAME"))
+        topic_base_name = "/" + "miro" # os.getenv(str("MIRO_ROBOT_NAME")) - for IRL implementation
         topicpackage = topic_base_name+"/sensors/package"
         # Create two new subscribers to recieve camera images with attached callbacks
         self.sub_caml = rospy.Subscriber(
@@ -270,7 +265,7 @@ class MiRoClient:
         self.new_frame = [False, False]
         # Create variable to store a list of ball's x, y, and r values for each camera
         self.doorway = [None, None]
-        # Set the default frame width (gets updated on reciecing an image)
+        # Set the default frame width (gets updated on recieving an image)
         self.frame_width = 640
         # Action selector to reduce duplicate printing to the terminal
         self.just_switched = True
@@ -278,13 +273,15 @@ class MiRoClient:
         self.bookmark = 0
         # Sonar sensor
         self.sonar=None
+        # Variables relating to tags
         self.foundRoomTags=[]
-        self.dictAllTags={'A':[[0,1],[2,3]], 'B':[[4,5],[6,7]], 'C':[[8,9],[10,11]]}
+        self.dictAllTags={'A':[[0,1]], 'B':[[2,3]]}
         self.currentRoom=None
         self.allRoomTags=[]
+        # Instantiate april tag class
+
         # Move the head to default pose
         self.reset_head_pose()
-	self.tag = AprilTagPerception(10)
 
 
     def loop(self):
@@ -295,17 +292,17 @@ class MiRoClient:
         # Main control loop iteration counter
         self.counter = 0
         # This switch loops through MiRo behaviours:
-        # Find ball, lock on to the ball and kick ball
         self.status_code = 0
+        self.tag = AprilTagPerception(10)
         while not rospy.core.is_shutdown():
 
-            # Step 1. Find ball
+            # Step 1. Find all AprilTags in a room
             if self.status_code == 1:
                 # Every once in a while, look for ball
                 if self.counter % self.CAM_FREQ == 0:
                     self.look_for_AprilTags()
 
-            # Step 2. Approach
+            # Step 2. Move through doorway between two AprilTags
             elif self.status_code == 2:
                 self.find_Doorway()
 
