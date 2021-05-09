@@ -198,7 +198,7 @@ class MiRoClient:
         if self.just_switched:  # Print once
             print("MiRo is finding a doorway...")
             self.just_switched = False
-
+        self.drive(0, 0)
         for index in range(2):  # For each camera (0 = left, 1 = right)
             # Skip if there's no new image, in case the network is choking
             if not self.new_frame[index]:
@@ -207,17 +207,47 @@ class MiRoClient:
             flat_img = self.rectifyImages(image, index)
             # Run the detect ball procedure
             self.doorway[index] = self.detect_AprilTags(flat_img, index)
+            
+        for i, y in enumerate(self.doorway):
+            self.doorway[i] = list(filter(lambda x: x[0] > 49 or x[0] < 40, self.doorway[i])) if y else y
 
+        
         if not self.doorway[0] and not self.doorway[1]:
-            self.drive(-self.SLOW, self.SLOW)
+            if self.middle_flag:
+                self.status_code = 3
+            self.drive(0.2, 0.4)
+        elif self.doorway[0] and self.doorway[1]:
+            if len(self.doorway[0]) == 1 and len(self.doorway[1]) == 1:
+                self.middle_flag=True
+                self.drive(0.25, 0.25)
+            elif len(self.doorway[0]) == 2 and len(self.doorway[1]) < 2:
+                self.middle_flag = True
+                self.drive(0.2, 0.4)
+            elif len(self.doorway[0]) < 2 and len(self.doorway[1]) == 2:   
+                self.middle_flag = True
+                self.drive(0.4, 0.2)
+
+            print(1)
+
         elif not self.doorway[0] and self.doorway[1]:
-            self.drive(-self.SLOW, self.SLOW)
+            tags_in_sight = [x[0] for x in self.doorway[1]]
+            even_tag = list(filter( lambda x: x%2 == 0, tags_in_sight))
+            if even_tag:
+                self.drive(0.4, 0.2)
+            else:
+                self.drive(0.2, 0.4)
+            print(3)
         elif self.doorway[0] and not self.doorway[1]:
-            self.drive(-self.SLOW, self.SLOW)
-        elif len(self.doorway[0]) == 2 and len(self.doorway[1]) == 2:
-            self.drive(self.FAST, self.FAST)
+            tags_in_sight = [x[0] for x in self.doorway[0]]
+            odd_tag = list(filter( lambda x: x%2 == 1, tags_in_sight))
+            if odd_tag:
+                self.drive(0.2, 0.4)
+            else:
+                self.drive(0.4, 0.2)
+            print(4)
         else:
-            print(len(self.doorway[0]), len(self.doorway[1]))
+            print(5)
+            #print(len(self.doorway[0]), len(self.doorway[1]))
             self.drive(-self.SLOW, self.SLOW)
 
 
@@ -291,6 +321,7 @@ class MiRoClient:
         print("MiRo plays ball, press CTRL+C to halt...")
         # Main control loop iteration counter
         self.counter = 0
+        self.middle_flag = False
         # This switch loops through MiRo behaviours:
         self.status_code = 0
         self.tag = AprilTagPerception(10)
@@ -305,7 +336,9 @@ class MiRoClient:
             # Step 2. Move through doorway between two AprilTags
             elif self.status_code == 2:
                 self.find_Doorway()
-
+            
+            elif self.status_code == 3:
+                self.drive(0.25, 0.25)
             # Fall back
             else:
                 self.status_code = 1
