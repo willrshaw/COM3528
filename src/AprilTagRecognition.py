@@ -150,7 +150,7 @@ class MiRoClient:
                 tagsFound.append([tags[i].id, tags[i].distance, tags[i].centre])
 	return tagsFound
 
-
+    # First tag indicates room MiRo is in - then looks for rest of AprilTags defined to be in given room
     # Switches to move through doorway once all AprilTags in a given room are identified
     def look_for_AprilTags(self):
         """
@@ -169,11 +169,14 @@ class MiRoClient:
 
             if len(detected) > 0 and len(self.foundRoomTags) == 0:
                 for key in self.dictAllTags:
-                    vals = self.dictAllTags.get(key)
-                    flat = list(chain.from_iterable(vals))
+                    vals = self.dictAllTags.get(key) # get the values for a given key (room name)
+                    flat = list(chain.from_iterable(vals)) # flatten key values (roomt ags)
                     if detected[0][0] in flat:
                         self.currentRoom = key
                         self.allRoomTags = flat
+                        if self.currentRoom == self.previousRoom:
+                            self.status_code = 3
+                            break
                         break
 
             for tag in detected:
@@ -182,8 +185,7 @@ class MiRoClient:
         # Have all AprilTags been detected?
         justIdsFound = [item[0] for item in self.foundRoomTags]
         if sorted(justIdsFound) == sorted(self.allRoomTags) and len(self.allRoomTags) > 0:
-            print("Found all tags in room")
-            print(self.foundRoomTags, self.allRoomTags)
+            print("Found all tags in room: ", justIdsFound)
             self.status_code = 2
             self.just_switched = True
         else:
@@ -270,7 +272,6 @@ class MiRoClient:
         for i, y in enumerate(self.target):
             self.target[i] = list(filter(lambda x:  x[0] >= 13, self.target[i])) if y else y
 
-
         target_distances = []
         if not self.target[0] and not self.target[1]:
             self.drive(self.SLOW, self.SLOW)
@@ -285,6 +286,7 @@ class MiRoClient:
             if done_flag:
                 self.status_code = 1
                 self.just_switched = True
+                self.foundRoomTags=[]
             else:
             # If only the right camera sees the ball, rotate clockwise
                 if not self.target[0] and self.target[1]:
@@ -295,22 +297,8 @@ class MiRoClient:
                 # Make the MiRo face the ball if it's visible with both cameras
                 elif self.target[0] and self.target[1]:
                     # if self.target[0][1]
-                    self.drive(0.3,0.3)
-                    # error = 0.2  # 5% of image width
-                    # # Use the normalised values
-                    # left_x = self.ball[0][0]  # should be in range [0.0, 0.5]
-                    # right_x = self.ball[1][0]  # should be in range [-0.5, 0.0]
-                    # rotation_speed = 0.03  # Turn even slower now
-                    # if abs(left_x) - abs(right_x) > error:
-                    #     self.drive(rotation_speed, -rotation_speed)  # turn clockwise
-                    # elif abs(left_x) - abs(right_x) < -error:
-                    #     self.drive(-rotation_speed, rotation_speed)  # turn counterclockwise
-                    # else:
-                    #     # Successfully turned to face the ball
-                    #     self.status_code = 3  # Switch to the third action
-                    #     self.just_switched = True
-                    #     self.bookmark = self.counter
-                # Otherwise, the ball is lost :-(
+                    self.drive(0.5,0.5)
+                    # Could centre on target moreso here but probably not necessary
                 else:
                     self.drive(self.SLOW, -self.SLOW)
                     # self.status_code = 0  # Go back to square 1...
@@ -375,9 +363,10 @@ class MiRoClient:
         self.foundRoomTags=[]
         self.tags_used = []
         self.dictAllTags={'A':[[0,1]], 'B':[[2,3]]}
-        self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
+        # self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
         self.currentRoom=None
         self.allRoomTags=[]
+        self.previousRoom=None
         # Instantiate april tag class
 
         # Move the head to default pose
@@ -396,7 +385,6 @@ class MiRoClient:
         self.status_code = 0
         self.tag = AprilTagPerception(10)
         while not rospy.core.is_shutdown():
-
             # Step 1. Find all AprilTags in a room
             if self.status_code == 1:
                 # Every once in a while, look for ball
@@ -422,3 +410,4 @@ class MiRoClient:
 if __name__ == "__main__":
     main = MiRoClient()  # Instantiate class
     main.loop()  # Run the main control loop
+
