@@ -198,7 +198,7 @@ class MiRoClient:
         if self.just_switched:  # Print once
             print("MiRo is finding a doorway...")
             self.just_switched = False
-        self.drive(0, 0)
+
         for index in range(2):  # For each camera (0 = left, 1 = right)
             # Skip if there's no new image, in case the network is choking
             if not self.new_frame[index]:
@@ -207,11 +207,11 @@ class MiRoClient:
             flat_img = self.rectifyImages(image, index)
             # Run the detect ball procedure
             self.doorway[index] = self.detect_AprilTags(flat_img, index)
-            
-        for i, y in enumerate(self.doorway):
-            self.doorway[i] = list(filter(lambda x: x[0] > 49 or x[0] < 40, self.doorway[i])) if y else y
 
-        
+        for i, y in enumerate(self.doorway):
+            self.doorway[i] = list(filter(lambda x:  x[0] < 13, self.doorway[i])) if y else y
+
+
         if not self.doorway[0] and not self.doorway[1]:
             if self.middle_flag:
                 self.status_code = 3
@@ -223,7 +223,7 @@ class MiRoClient:
             elif len(self.doorway[0]) == 2 and len(self.doorway[1]) < 2:
                 self.middle_flag = True
                 self.drive(0.2, 0.4)
-            elif len(self.doorway[0]) < 2 and len(self.doorway[1]) == 2:   
+            elif len(self.doorway[0]) < 2 and len(self.doorway[1]) == 2:
                 self.middle_flag = True
                 self.drive(0.4, 0.2)
 
@@ -250,6 +250,62 @@ class MiRoClient:
             #print(len(self.doorway[0]), len(self.doorway[1]))
             self.drive(-self.SLOW, self.SLOW)
 
+
+    def lock_onto_target(self, error=25):
+        """
+        [2 of 3] Once a ball has been detected, turn MiRo to face it
+        """
+        if self.just_switched:  # Print once
+            print("MiRo is Heading into the new Room")
+            self.just_switched = False
+
+        for index in range(2):  # For each camera (0 = left, 1 = right)
+            # Skip if there's no new image, in case the network is choking
+            if not self.new_frame[index]:
+                continue
+            image = self.input_camera[index]
+            flat_img = self.rectifyImages(image, index)
+            # Run the detect ball procedure
+            self.target[index] = self.detect_AprilTags(flat_img, index)
+
+        for i, y in enumerate(self.target):
+            self.target[i] = list(filter(lambda x:  x[0] >= 13, self.target[i])) if y else y
+
+        if 100 in [x[1] for x in self.target]:
+            done_flag = True
+
+        if done_flag:
+            self.status_code = 1
+        else:
+        # If only the right camera sees the ball, rotate clockwise
+            if not self.target[0] and self.target[1]:
+                self.drive(self.SLOW, -self.SLOW)
+            # Conversely, rotate counterclockwise
+            elif self.target[0] and not self.target[1]:
+                self.drive(-self.SLOW, self.SLOW)
+            # Make the MiRo face the ball if it's visible with both cameras
+            elif self.target[0] and self.target[1]:
+                self.drive(self.SLOW,self.SLOW)
+                # error = 0.2  # 5% of image width
+                # # Use the normalised values
+                # left_x = self.ball[0][0]  # should be in range [0.0, 0.5]
+                # right_x = self.ball[1][0]  # should be in range [-0.5, 0.0]
+                # rotation_speed = 0.03  # Turn even slower now
+                # if abs(left_x) - abs(right_x) > error:
+                #     self.drive(rotation_speed, -rotation_speed)  # turn clockwise
+                # elif abs(left_x) - abs(right_x) < -error:
+                #     self.drive(-rotation_speed, rotation_speed)  # turn counterclockwise
+                # else:
+                #     # Successfully turned to face the ball
+                #     self.status_code = 3  # Switch to the third action
+                #     self.just_switched = True
+                #     self.bookmark = self.counter
+            # Otherwise, the ball is lost :-(
+            else:
+                self.drive(self.SLOW, -self.SLOW)
+                # self.status_code = 0  # Go back to square 1...
+                print("MiRo has lost the target...")
+            # self.just_switched = True
 
 
     def __init__(self):
@@ -336,7 +392,7 @@ class MiRoClient:
             # Step 2. Move through doorway between two AprilTags
             elif self.status_code == 2:
                 self.find_Doorway()
-            
+
             elif self.status_code == 3:
                 self.drive(0.25, 0.25)
             # Fall back
