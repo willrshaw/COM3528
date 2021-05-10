@@ -215,7 +215,9 @@ class MiRoClient:
         if not self.doorway[0] and not self.doorway[1]:
             if self.middle_flag:
                 self.status_code = 3
-            self.drive(0.2, 0.4)
+                self.just_switched = True
+            else:
+                self.drive(0.2, 0.4)
         elif self.doorway[0] and self.doorway[1]:
             if len(self.doorway[0]) == 1 and len(self.doorway[1]) == 1:
                 self.middle_flag=True
@@ -227,7 +229,6 @@ class MiRoClient:
                 self.middle_flag = True
                 self.drive(0.4, 0.2)
 
-            print(1)
 
         elif not self.doorway[0] and self.doorway[1]:
             tags_in_sight = [x[0] for x in self.doorway[1]]
@@ -236,7 +237,6 @@ class MiRoClient:
                 self.drive(0.4, 0.2)
             else:
                 self.drive(0.2, 0.4)
-            print(3)
         elif self.doorway[0] and not self.doorway[1]:
             tags_in_sight = [x[0] for x in self.doorway[0]]
             odd_tag = list(filter( lambda x: x%2 == 1, tags_in_sight))
@@ -244,7 +244,6 @@ class MiRoClient:
                 self.drive(0.2, 0.4)
             else:
                 self.drive(0.4, 0.2)
-            print(4)
         else:
             print(5)
             #print(len(self.doorway[0]), len(self.doorway[1]))
@@ -271,41 +270,52 @@ class MiRoClient:
         for i, y in enumerate(self.target):
             self.target[i] = list(filter(lambda x:  x[0] >= 13, self.target[i])) if y else y
 
-        if 100 in [x[1] for x in self.target]:
-            done_flag = True
 
-        if done_flag:
-            self.status_code = 1
+        target_distances = []
+        if not self.target[0] and not self.target[1]:
+            self.drive(self.SLOW, self.SLOW)
         else:
-        # If only the right camera sees the ball, rotate clockwise
-            if not self.target[0] and self.target[1]:
-                self.drive(self.SLOW, -self.SLOW)
-            # Conversely, rotate counterclockwise
-            elif self.target[0] and not self.target[1]:
-                self.drive(-self.SLOW, self.SLOW)
-            # Make the MiRo face the ball if it's visible with both cameras
-            elif self.target[0] and self.target[1]:
-                self.drive(self.SLOW,self.SLOW)
-                # error = 0.2  # 5% of image width
-                # # Use the normalised values
-                # left_x = self.ball[0][0]  # should be in range [0.0, 0.5]
-                # right_x = self.ball[1][0]  # should be in range [-0.5, 0.0]
-                # rotation_speed = 0.03  # Turn even slower now
-                # if abs(left_x) - abs(right_x) > error:
-                #     self.drive(rotation_speed, -rotation_speed)  # turn clockwise
-                # elif abs(left_x) - abs(right_x) < -error:
-                #     self.drive(-rotation_speed, rotation_speed)  # turn counterclockwise
-                # else:
-                #     # Successfully turned to face the ball
-                #     self.status_code = 3  # Switch to the third action
-                #     self.just_switched = True
-                #     self.bookmark = self.counter
-            # Otherwise, the ball is lost :-(
+            for i, y in enumerate(self.target):
+                target_distances.extend([x[1]  for x in self.target[i]] if self.target[i] else [])
+
+            done_flag = False
+            if list(filter(lambda x: abs(x)<50, target_distances)):
+                done_flag = True
+
+            if done_flag:
+                self.status_code = 1
+                self.just_switched = True
             else:
-                self.drive(self.SLOW, -self.SLOW)
-                # self.status_code = 0  # Go back to square 1...
-                print("MiRo has lost the target...")
-            # self.just_switched = True
+            # If only the right camera sees the ball, rotate clockwise
+                if not self.target[0] and self.target[1]:
+                    self.drive(self.SLOW+1.54, -self.SLOW)
+                # Conversely, rotate counterclockwise
+                elif self.target[0] and not self.target[1]:
+                    self.drive(-self.SLOW, self.SLOW)
+                # Make the MiRo face the ball if it's visible with both cameras
+                elif self.target[0] and self.target[1]:
+                    # if self.target[0][1]
+                    self.drive(0.3,0.3)
+                    # error = 0.2  # 5% of image width
+                    # # Use the normalised values
+                    # left_x = self.ball[0][0]  # should be in range [0.0, 0.5]
+                    # right_x = self.ball[1][0]  # should be in range [-0.5, 0.0]
+                    # rotation_speed = 0.03  # Turn even slower now
+                    # if abs(left_x) - abs(right_x) > error:
+                    #     self.drive(rotation_speed, -rotation_speed)  # turn clockwise
+                    # elif abs(left_x) - abs(right_x) < -error:
+                    #     self.drive(-rotation_speed, rotation_speed)  # turn counterclockwise
+                    # else:
+                    #     # Successfully turned to face the ball
+                    #     self.status_code = 3  # Switch to the third action
+                    #     self.just_switched = True
+                    #     self.bookmark = self.counter
+                # Otherwise, the ball is lost :-(
+                else:
+                    self.drive(self.SLOW, -self.SLOW)
+                    # self.status_code = 0  # Go back to square 1...
+                    print("MiRo has lost the target...")
+                # self.just_switched = True
 
 
     def __init__(self):
@@ -351,6 +361,8 @@ class MiRoClient:
         self.new_frame = [False, False]
         # Create variable to store a list of ball's x, y, and r values for each camera
         self.doorway = [None, None]
+
+        self.target = [None, None]
         # Set the default frame width (gets updated on recieving an image)
         self.frame_width = 640
         # Action selector to reduce duplicate printing to the terminal
@@ -361,7 +373,9 @@ class MiRoClient:
         self.sonar=None
         # Variables relating to tags
         self.foundRoomTags=[]
+        self.tags_used = []
         self.dictAllTags={'A':[[0,1]], 'B':[[2,3]]}
+        self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
         self.currentRoom=None
         self.allRoomTags=[]
         # Instantiate april tag class
@@ -394,7 +408,7 @@ class MiRoClient:
                 self.find_Doorway()
 
             elif self.status_code == 3:
-                self.drive(0.25, 0.25)
+                self.lock_onto_target()
             # Fall back
             else:
                 self.status_code = 1
