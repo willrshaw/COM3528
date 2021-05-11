@@ -280,7 +280,7 @@ class MiRoClient:
                 target_distances.extend([x[1]  for x in self.target[i]] if self.target[i] else [])
 
             done_flag = False
-            if list(filter(lambda x: abs(x)<50, target_distances)):
+            if list(filter(lambda x: abs(x)<35, target_distances)):
                 done_flag = True
 
             if done_flag:
@@ -305,6 +305,43 @@ class MiRoClient:
                     print("MiRo has lost the target...")
                 # self.just_switched = True
 
+    def select_room(self):
+        room_selection = None
+        while True:
+            done = False
+            print('Please Enter a room to nagigate to:')
+            print('Valid Rooms include:', self.room_to_room[self.current_room])
+
+            room_selection = str(raw_input('Enter here: '))
+            if room_selection in self.room_to_room[self.current_room]:
+                print('Navigating to room:', room_selection)
+                done=True
+            else:
+                print('Invalid Input')
+
+            if done:
+                break
+
+        self.status_code = 5
+        self.navigating_to_room = room_selection
+
+    def navigate_to_room(self):
+
+        tags_to_look_for = list(filter(lambda x: x in dictAllTags[current_room],
+                                       dictAllTags_to_enter[navigating_to]))
+
+        for index in range(2):  # For each camera (0 = left, 1 = right)
+            # Skip if there's no new image, in case the network is choking
+            if not self.new_frame[index]:
+                continue
+            image = self.input_camera[index]
+            flat_img = self.rectifyImages(image, index)
+            # Run the detect ball procedure
+            self.nav_tags[index] = self.detect_AprilTags(flat_img, index)
+
+
+
+
 
     def __init__(self):
         # Initialise a new ROS node to communicate with MiRo
@@ -326,7 +363,7 @@ class MiRoClient:
             tcp_nodelay=True,
         )
         self.sub_camr = rospy.Subscriber(
-            topic_base_name + "/sensors/camr/compressed",
+            topic_base_name + "/sensors/camdictAllTags_to_enterr/compressed",
             CompressedImage,
             self.callback_camr,
             queue_size=1,
@@ -342,7 +379,7 @@ class MiRoClient:
         )
         self.sub_package = rospy.Subscriber(topicpackage, miro.msg.sensors_package,
             self.callback_package
-        )
+        )dictAllTags_to_enter
         # Create handle to store images
         self.input_camera = [None, None]
         # New frame notification
@@ -351,6 +388,7 @@ class MiRoClient:
         self.doorway = [None, None]
 
         self.target = [None, None]
+        self.nav_tags = [None, None]
         # Set the default frame width (gets updated on recieving an image)
         self.frame_width = 640
         # Action selector to reduce duplicate printing to the terminal
@@ -358,16 +396,23 @@ class MiRoClient:
         # Bookmark
         self.bookmark = 0
         # Sonar sensor
-        self.sonar=None
+        self.sonar=NonedictAllTags_to_enter
         # Variables relating to tags
         self.foundRoomTags=[]
         self.tags_used = []
         self.dictAllTags={'A':[[0,1]], 'B':[[2,3]]}
-        # self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
+
+        self.room_to_room={'A':[],'B':[]}
+
+        self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
         self.currentRoom=None
+
+        self.navigating_to_room = None
+
         self.allRoomTags=[]
         self.previousRoom=None
-        # Instantiate april tag class
+        self.inverseDictAllTags = {0:'A',1:'A',2:'B',3:'B'}
+        # Instantiate april tag classdictAllTags_to_enter
 
         # Move the head to default pose
         self.reset_head_pose()
@@ -382,12 +427,13 @@ class MiRoClient:
         self.counter = 0
         self.middle_flag = False
         # This switch loops through MiRo behaviours:
-        self.status_code = 0
+        self.status_code = 4
         self.tag = AprilTagPerception(10)
         while not rospy.core.is_shutdown():
             # Step 1. Find all AprilTags in a room
             if self.status_code == 1:
-                # Every once in a while, look for ball
+                # Every once in a while, look for ball        self.current_room='A'
+
                 if self.counter % self.CAM_FREQ == 0:
                     self.look_for_AprilTags()
 
@@ -397,12 +443,14 @@ class MiRoClient:
 
             elif self.status_code == 3:
                 self.lock_onto_target()
+            elif self.status_code == 4:
+                self.select_room()
             # Fall back
             else:
                 self.status_code = 1
 
             # Yield
-            self.counter += 1
+            self.counter += 1select_room
             rospy.sleep(self.TICK)
 
 
@@ -410,4 +458,3 @@ class MiRoClient:
 if __name__ == "__main__":
     main = MiRoClient()  # Instantiate class
     main.loop()  # Run the main control loop
-
