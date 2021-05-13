@@ -166,6 +166,7 @@ class MiRoClient:
             flat_img = self.rectifyImages(image, 0)
             # Run the detect AprilTag procedure
             detected = self.detect_AprilTags(flat_img, 0)
+            detected = list(filter(lambda x: x<13, detected))
 
             if len(detected) > 0 and len(self.foundRoomTags) == 0:
                 for key in self.dictAllTags:
@@ -281,23 +282,24 @@ class MiRoClient:
             for i, y in enumerate(self.target):
                 target_distances.extend([x[1]  for x in self.target[i]] if self.target[i] else [])
 
-            if   self.navigating_to_room is None:
+            if self.navigating_to_room is None:
                 for i, y in enumerate(self.target):
-                    print(self.navigating_to_room)
-                    print(self.target)
-                    print([x[0]  for x in self.target[i]] if self.target[i] else [])
                     tags_numbers = [x[0]  for x in self.target[i]] if self.target[i] else []
-                    self.navigating_to_room = self.target_belongs_to_room[tags_numbers[0]]
-                    print(self.navigating_to_room)
+                    tags_numbers = list(filter(lambda x: x is not None, tags_numbers))
+
+                self.navigating_to_room = self.target_belongs_to_room[tags_numbers[0]]
 
             done_flag = False
-            if list(filter(lambda x: abs(x)<35, target_distances)):
+            if list(filter(lambda x: abs(x)<50, target_distances)):
                 done_flag = True
 
             if done_flag:
+                print('i got in here for some reson')
                 self.status_code = 1
                 self.just_switched = True
                 self.navigating_to_room = None
+                self.previousRoom = self.currentRoom
+
                 self.currentRoom = self.navigating_to_room
             else:
             # If only the right camera sees the ball, rotate clockwise
@@ -375,7 +377,7 @@ class MiRoClient:
             tcp_nodelay=True,
         )
         self.sub_camr = rospy.Subscriber(
-            topic_base_name + "/sensors/camdictAllTags_to_enterr/compressed",
+            topic_base_name + "/sensors/camr/compressed",
             CompressedImage,
             self.callback_camr,
             queue_size=1,
