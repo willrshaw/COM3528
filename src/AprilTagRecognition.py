@@ -216,6 +216,7 @@ class MiRoClient:
 
         if not self.doorway[0] and not self.doorway[1]:
             if self.middle_flag:
+                self.drive(0.4, 0.4)
                 self.status_code = 3
                 self.just_switched = True
             else:
@@ -276,8 +277,18 @@ class MiRoClient:
         if not self.target[0] and not self.target[1]:
             self.drive(self.SLOW, self.SLOW)
         else:
+
             for i, y in enumerate(self.target):
                 target_distances.extend([x[1]  for x in self.target[i]] if self.target[i] else [])
+
+            if   self.navigating_to_room is None:
+                for i, y in enumerate(self.target):
+                    print(self.navigating_to_room)
+                    print(self.target)
+                    print([x[0]  for x in self.target[i]] if self.target[i] else [])
+                    tags_numbers = [x[0]  for x in self.target[i]] if self.target[i] else []
+                    self.navigating_to_room = self.target_belongs_to_room[tags_numbers[0]]
+                    print(self.navigating_to_room)
 
             done_flag = False
             if list(filter(lambda x: abs(x)<35, target_distances)):
@@ -286,7 +297,8 @@ class MiRoClient:
             if done_flag:
                 self.status_code = 1
                 self.just_switched = True
-                self.foundRoomTags=[]
+                self.navigating_to_room = None
+                self.currentRoom = self.navigating_to_room
             else:
             # If only the right camera sees the ball, rotate clockwise
                 if not self.target[0] and self.target[1]:
@@ -327,8 +339,8 @@ class MiRoClient:
 
     def navigate_to_room(self):
 
-        tags_to_look_for = list(filter(lambda x: x in dictAllTags[current_room],
-                                       dictAllTags_to_enter[navigating_to]))
+        tags_to_look_for = list(filter(lambda x: x in self.dictAllTags[self.currentRoom],
+                                       self.dictAllTags_to_enter[self.navigating_to_room]))
 
         for index in range(2):  # For each camera (0 = left, 1 = right)
             # Skip if there's no new image, in case the network is choking
@@ -379,7 +391,7 @@ class MiRoClient:
         )
         self.sub_package = rospy.Subscriber(topicpackage, miro.msg.sensors_package,
             self.callback_package
-        )dictAllTags_to_enter
+        )
         # Create handle to store images
         self.input_camera = [None, None]
         # New frame notification
@@ -396,7 +408,7 @@ class MiRoClient:
         # Bookmark
         self.bookmark = 0
         # Sonar sensor
-        self.sonar=NonedictAllTags_to_enter
+        self.sonar=None
         # Variables relating to tags
         self.foundRoomTags=[]
         self.tags_used = []
@@ -404,15 +416,17 @@ class MiRoClient:
 
         self.room_to_room={'A':[],'B':[]}
 
-        self.dictAllTags_to_enter={'B':[[0,1]], 'A':[[2,3]]}
+        self.dictAllTags_to_enter={'B':[], 'A':[]}
         self.currentRoom=None
 
         self.navigating_to_room = None
 
         self.allRoomTags=[]
         self.previousRoom=None
+
+        self.target_belongs_to_room = {14:'B', 15:'A'}
         self.inverseDictAllTags = {0:'A',1:'A',2:'B',3:'B'}
-        # Instantiate april tag classdictAllTags_to_enter
+        # Instantiate april tag class
 
         # Move the head to default pose
         self.reset_head_pose()
@@ -427,7 +441,7 @@ class MiRoClient:
         self.counter = 0
         self.middle_flag = False
         # This switch loops through MiRo behaviours:
-        self.status_code = 4
+        self.status_code = 0
         self.tag = AprilTagPerception(10)
         while not rospy.core.is_shutdown():
             # Step 1. Find all AprilTags in a room
@@ -450,7 +464,7 @@ class MiRoClient:
                 self.status_code = 1
 
             # Yield
-            self.counter += 1select_room
+            self.counter += 1
             rospy.sleep(self.TICK)
 
 
