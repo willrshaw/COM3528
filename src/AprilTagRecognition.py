@@ -159,6 +159,7 @@ class MiRoClient:
         """
         if len(self.foundRoomTags) == 4:
             self.status_code=4
+            self.mapping_done = True
             print('Mapping is complete')
             return
 
@@ -207,6 +208,7 @@ class MiRoClient:
         [2 of 3] Once all AprilTags in the room are found and the room it is in is known...
         Detect a doorway to move through
         """
+
         if self.just_switched:  # Print once
             print("MiRo is finding a doorway...")
             self.just_switched = False
@@ -227,9 +229,10 @@ class MiRoClient:
         if not self.doorway[0] and not self.doorway[1]:
             if self.middle_flag:
                 self.drive(0.4, 0.4)
-
+                self.doorway = [None,None]
                 self.status_code = 3
                 self.just_switched = True
+                self.middle_flag = False
             else:
                 self.drive(0.2, 0.4)
         elif self.doorway[0] and self.doorway[1]:
@@ -271,6 +274,7 @@ class MiRoClient:
         if self.just_switched:  # Print once
             print("MiRo is Heading into the new Room")
             self.just_switched = False
+
         for index in range(2):  # For each camera (0 = left, 1 = right)
             # Skip if there's no new image, in case the network is choking
             if not self.new_frame[index]:
@@ -300,7 +304,7 @@ class MiRoClient:
                 self.navigating_to_room = self.target_belongs_to_room[tags_numbersl[0]]
 
             done_flag = False
-            if list(filter(lambda x: abs(x)<50, target_distances)):
+            if list(filter(lambda x: abs(x)<45, target_distances)):
                 done_flag = True
 
             if done_flag:
@@ -315,10 +319,11 @@ class MiRoClient:
 
                 self.currentRoom = self.navigating_to_room
                 self.navigating_to_room = None
-                self.dictAllTags_to_enter[self.currentRoom].append([self.tags_used[0][0],
-                                                                           self.tags_used[1][0]])
-                self.room_to_room[self.previousRoom].append(self.currentRoom)
-                self.tags_used = []
+                if not self.mapping_done:
+                    self.dictAllTags_to_enter[self.currentRoom].append([self.tags_used[0][0],
+                                                                        self.tags_used[1][0]])
+                    self.room_to_room[self.previousRoom].append(self.currentRoom)
+                    self.tags_used = []
 
 
             else:
@@ -340,14 +345,17 @@ class MiRoClient:
                 # self.just_switched = True
 
     def select_room(self):
-
+        print(self.room_to_room)
+        print(self.dictAllTags_to_enter)
         room_selection = None
+        print(self.currentRoom)
+        print(self.previousRoom)
         while True:
             done = False
             print('Please Enter a room to nagigate to:')
             print('Valid Rooms include:', self.room_to_room[self.currentRoom])
 
-            # room_selection = str(raw_input('Enter here: '))
+            room_selection = str(raw_input('Enter here: '))
             if room_selection in self.room_to_room[self.currentRoom]:
                 print('Navigating to room:', room_selection)
                 done=True
@@ -361,11 +369,14 @@ class MiRoClient:
         self.navigating_to_room = room_selection
 
 
-    def navigate_to_room(self):
+    def find_room_door(self):
+
+        if self.just_switched:  # Print once
+            print("MiRo is looking for the right door")
+            self.just_switched = False
 
         tags_to_look_for = list(filter(lambda x: x in self.dictAllTags[self.currentRoom],
                                        self.dictAllTags_to_enter[self.navigating_to_room]))
-
         for index in range(2):  # For each camera (0 = left, 1 = right)
             # Skip if there's no new image, in case the network is choking
             if not self.new_frame[index]:
@@ -374,6 +385,19 @@ class MiRoClient:
             flat_img = self.rectifyImages(image, index)
             # Run the detect ball procedure
             self.nav_tags[index] = self.detect_AprilTags(flat_img, index)
+
+        for i, y in enumerate(self.nav_tags):
+            self.nav_tags[i] = list(filter(lambda x:  x[0] < 13, self.nav_tags[i])) if y else y
+
+        if self.nav_tags[0]:
+            tags_identified = [x[0] for x in self.nav_tags[0]]
+            if tags_identified in tags_to_look_for:
+                self.status_code = 2
+                self.nav_tags = [None,None]
+                self.just_switched = True
+            self.drive(self.SLOW, -self.SLOW)
+        else:
+            self.drive(self.SLOW, -self.SLOW)
 
 
 
@@ -447,6 +471,7 @@ class MiRoClient:
 
         self.allRoomTags=[]
         self.previousRoom=None
+        self.mapping_done = False
         self.status_code=0
         self.target_belongs_to_room = {14:'B', 15:'A'}
         # Instantiate april tag class
@@ -481,6 +506,8 @@ class MiRoClient:
                 self.lock_onto_target()
             elif self.status_code == 4:
                 self.select_room()
+            elif self.status_code == 5:
+                self.find_room_door()
             # Fall back
             else:
                 self.status_code = 1
