@@ -5,7 +5,7 @@ COM3528. We researched, designed and developed a system for the robotics
 platform [MiRo](http://consequentialrobotics.com/) which uses
  [AprilTags](https://april.eecs.umich.edu/software/apriltag) to identify rooms
  in a building, generate a map of these rooms and then navigate. We would like
- to espically thank [koide3](https://github.com/koide3) and
+ to especially thank [koide3](https://github.com/koide3) and
   [AprilRobotics](https://github.com/AprilRobotics/apriltag-imgs/tree/b53998d83ce4cc4f543eec28a66cffb6372ca73e)
    for the models of the AprilTags and the Images which they are based off.
    Below is the abstract for the [paper]() written to document this project.
