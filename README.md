@@ -9,7 +9,7 @@ platform [MiRo](http://consequentialrobotics.com/) which uses
   [AprilRobotics](https://github.com/AprilRobotics/apriltag-imgs/tree/b53998d83ce4cc4f543eec28a66cffb6372ca73e)
    for the models of the AprilTags and the Images which they are based off.
    Below is the abstract for the [paper]() written to document this project.
-### abstract
+### Abstract
 Social robots such as MiRo have an important role to play in the future; they can be a very useful
  tool in care homes as they can engage with people of need at an emotional level and provide entertainment. This
  project explores the use of AprilTags in order for a MiRo robot to be able to map its surroundings and navigate to
