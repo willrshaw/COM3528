@@ -9,7 +9,7 @@ platform [MiRo](http://consequentialrobotics.com/) which uses
   [AprilRobotics](https://github.com/AprilRobotics/apriltag-imgs/tree/b53998d83ce4cc4f543eec28a66cffb6372ca73e)
    for the models of the AprilTags and the Images which they are based off.
    Below is the abstract for the [paper]() written to document this project.
-### abstract
+### Abstract
 Social robots such as MiRo have an important role to play in the future; they can be a very useful
  tool in care homes as they can engage with people of need at an emotional level and provide entertainment. This
  project explores the use of AprilTags in order for a MiRo robot to be able to map its surroundings and navigate to
@@ -18,3 +18,16 @@ Social robots such as MiRo have an important role to play in the future; they ca
  such as MiRo at performing simple room mapping and navigation procedures in an environment such as a care
  home. The report concludes that the MiRo robot has successfully fulfilled the aims of this project, whilst detailing
  areas for future research.
+
+### Details on using this repo.
+We developed MiRo to work in the worlds called [2roomsmalltagstarget](./GazeboWorlds/2roomsmalltagstarget) and
+[3roomsmalltagstarget](./GazeboWorlds/3roomsmalltagstarget).
+
+Please keep these world files in the same folder as AprilTag36_11_000{00...15}s (with the s),  
+otherwise the AprilTags will not load in the world.  
+
+To run the [Script](./src/AprilTagRecognition.py), please start up Roscore, the simulator and then type
+$ python3 AprilTagRecognition.py.  
+If this isn't working, type this:  
+$chmod +x ./AprilTagRecognition.py  
+While in the same directory as the file.
