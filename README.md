@@ -27,7 +27,7 @@ Please keep these world files in the same folder as AprilTag36_11_000{00...15}s 
 otherwise the AprilTags will not load in the world.  
 
 To run the [Script](./src/AprilTagRecognition.py), please start up Roscore, the simulator and then type
-$ python3 AprilTagRecognition.py.  
+$ python AprilTagRecognition.py.  
 
 If this isn't working, type this:  
 
