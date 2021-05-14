@@ -8,7 +8,7 @@ platform [MiRo](http://consequentialrobotics.com/) which uses
  to especially thank [koide3](https://github.com/koide3) and
   [AprilRobotics](https://github.com/AprilRobotics/apriltag-imgs/tree/b53998d83ce4cc4f543eec28a66cffb6372ca73e)
    for the models of the AprilTags and the Images which they are based off.
-   Below is the abstract for the [paper]() written to document this project.
+   Below is the abstract for the [paper](./Report.pdf) written to document this project.
 ### Abstract
 Social robots such as MiRo have an important role to play in the future; they can be a very useful
  tool in care homes as they can engage with people of need at an emotional level and provide entertainment. This
@@ -28,6 +28,9 @@ otherwise the AprilTags will not load in the world.
 
 To run the [Script](./src/AprilTagRecognition.py), please start up Roscore, the simulator and then type
 $ python3 AprilTagRecognition.py.  
+
 If this isn't working, type this:  
+
 $chmod +x ./AprilTagRecognition.py  
+
 While in the same directory as the file.
